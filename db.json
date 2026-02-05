@@ -42,42 +42,42 @@
       "name": "自行车",
       "stock": "1",
       "weight": "1",
-      "color": "#b0b0b0"
+      "color": "#d24141"
     },
     {
       "id": 2,
       "name": "电脑",
       "stock": "2",
       "weight": "1",
-      "color": "#a6a6a6"
+      "color": "#f1e888"
     },
     {
       "id": 3,
       "name": "肥皂",
       "stock": 3,
       "weight": "1",
-      "color": "#ffffff"
+      "color": "#45a9d3"
     },
     {
       "id": 4,
       "name": "手机",
       "stock": 4,
       "weight": "1",
-      "color": "#a6a6a6"
+      "color": "#5e9ae8"
     },
     {
       "id": 5,
       "name": "奖品配置5",
       "stock": 5,
       "weight": "1",
-      "color": "#ffffff"
+      "color": "#f3b27c"
     },
     {
       "id": 6,
       "name": "奖品配置6",
       "stock": 10,
       "weight": "2",
-      "color": "#c2adad"
+      "color": "#9674c8"
     }
   ],
   "settings": {

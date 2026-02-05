@@ -13,8 +13,18 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'mobile.html'));
 });
 
-app.get('/large-screen.html', (req, res) => {
+// Mobile shortcut
+app.get('/mobile', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'mobile.html'));
+});
+
+// Big screen shortcut
+app.get('/screen', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/large-screen.html', (req, res) => {
+    res.redirect('/screen');
 });
 
 // Old route removed. New route defined below as ADMIN_ROUTE.

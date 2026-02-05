@@ -56,8 +56,8 @@ A high-performance, real-time lottery system designed for large-scale events and
    ```
 
 4. **Access the system (访问系统)**
-   - **Big Screen (大屏端)**: `http://<server-ip>:3000/`
-   - **Mobile Controller (手机控端)**: `http://<server-ip>:3000/mobile.html`
+   - **Big Screen (大屏端)**: `http://<server-ip>:3000/screen`
+   - **Mobile Controller (手机控端)**: `http://<server-ip>:3000/mobile` (or simply visit root `/` / 或者直接访问根路径)
    - **Admin Panel (管理后台)**: `http://<server-ip>:3000/admin` (Default path, configure in `server.js` / 默认路径，请在 server.js 中修改)
 
 ## 📂 Project Structure (目录结构)
