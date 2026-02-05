@@ -1,0 +1,113 @@
+:root {
+    --neon-blue: #00f3ff;
+    --neon-gold: #ffd700;
+}
+
+body {
+    margin: 0; padding: 0;
+    background: #000;
+    height: 100vh; width: 100vw;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden;
+    color: white;
+}
+
+/* 核心 16:9 容器 */
+#screen-app {
+    position: relative;
+    width: min(100vw, 100vh * 16 / 9);
+    height: min(100vh, 100vw * 9 / 16);
+    background: #000;
+    overflow: hidden;
+}
+
+/* 背景图和顶图 */
+#bg-img, #top-img {
+    position: absolute; top:0; left:0; width:100%; height:100%;
+    object-fit: cover; pointer-events: none;
+}
+#bg-img { z-index: 1; }
+#top-img { z-index: 10; }
+
+/* 旋转容器包装器 - 替代原来的#rotation-container */
+.rotation-wrapper {
+    position: absolute; 
+    top: 50%; 
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* 使用min()确保是正方形 */
+    width: min(65vh, 65vw * 9 / 16);
+    height: min(65vh, 65vw * 9 / 16);
+}
+
+#wheel-container-wrapper { z-index: 5; }
+#ufo-container-wrapper { z-index: 20; }
+
+/* 转盘 - 在旋转容器内 */
+#wheel-layer {
+    position: absolute; top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+}
+#wheelCanvas { width: 100%; height: 100%; }
+
+#ufo-layer {
+    position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+    pointer-events: none;
+}
+.ufo {
+    position: absolute;
+    width: 3.5vmin;
+    height: 3.5vmin;
+    border-radius: 50%;
+    border: 0.2vmin solid #ffffff;
+    background-size: cover;
+    background-position: center;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+}
+
+#dock-layer {
+    position: absolute; bottom: 3%; left: 0; width: 100%;
+    height: 8%;
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    gap: 1%; 
+    z-index: 30;
+    /* 超出隐藏，但子元素不缩小 */
+    overflow: hidden; 
+}
+.dock-avatar {
+    width: 3.5vmin;
+    height: 3.5vmin;
+    flex-shrink: 0; /* 防止被压缩 */
+    border-radius: 50%;
+    border: 0.1vmin solid rgba(255,255,255,0.3);
+    background-size: cover;
+    background-position: center;
+    filter: grayscale(1);
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+}
+.dock-avatar.online { 
+    filter: grayscale(0); 
+    border: 0.2vmin solid #ffffff;
+}
+
+.win-toast {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.95);
+    border: 2px solid var(--neon-gold);
+    padding: 3vh 6vh; border-radius: 20px;
+    text-align: center; z-index: 999;
+    box-shadow: 0 0 50px #000;
+}
+.win-toast h1 { margin: 0; font-size: 5vh; color: var(--neon-gold); }
+.win-toast p { font-size: 2.5vh; color: #fff; margin-top: 1vh; }
+
+.hidden { display: none !important; }
+
+/* 手机端登录页缩放 */
+#mobile-app { padding: 20px; width: 100%; box-sizing: border-box; }

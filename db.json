@@ -1,0 +1,86 @@
+{
+  "users": [
+    {
+      "name": "1",
+      "idCard": "1",
+      "avatar": "default.png",
+      "energy": 10000,
+      "history": []
+    },
+    {
+      "name": "2",
+      "idCard": "2",
+      "avatar": "default.png",
+      "energy": 10000,
+      "history": []
+    },
+    {
+      "name": "3",
+      "idCard": "3",
+      "avatar": "default.png",
+      "energy": 10000,
+      "history": []
+    },
+    {
+      "name": "4",
+      "idCard": "4",
+      "avatar": "default.png",
+      "energy": 10000,
+      "history": []
+    },
+    {
+      "name": "5",
+      "idCard": "5",
+      "avatar": "default.png",
+      "energy": 10000,
+      "history": []
+    }
+  ],
+  "prizes": [
+    {
+      "id": 1,
+      "name": "自行车",
+      "stock": "1",
+      "weight": "1",
+      "color": "#b0b0b0"
+    },
+    {
+      "id": 2,
+      "name": "电脑",
+      "stock": "2",
+      "weight": "1",
+      "color": "#a6a6a6"
+    },
+    {
+      "id": 3,
+      "name": "肥皂",
+      "stock": 3,
+      "weight": "1",
+      "color": "#ffffff"
+    },
+    {
+      "id": 4,
+      "name": "手机",
+      "stock": 4,
+      "weight": "1",
+      "color": "#a6a6a6"
+    },
+    {
+      "id": 5,
+      "name": "奖品配置5",
+      "stock": 5,
+      "weight": "1",
+      "color": "#ffffff"
+    },
+    {
+      "id": 6,
+      "name": "奖品配置6",
+      "stock": 10,
+      "weight": "2",
+      "color": "#c2adad"
+    }
+  ],
+  "settings": {
+    "randomAvatars": true
+  }
+}

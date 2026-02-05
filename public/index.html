@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>幸运转盘</title>
+    <script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+    <script>LA.init({id:"KhGqLj2WnzNaM08Z",ck:"KhGqLj2WnzNaM08Z",autoTrack:true,hashMode:true,screenRecord:true})</script>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="screen-app">
+        <img id="bg-img" src="bg.png">
+        
+        <div id="wheel-container-wrapper" class="rotation-wrapper">
+            <div id="wheel-layer"><canvas id="wheelCanvas" width="1000" height="1000"></canvas></div>
+        </div>
+        
+        <img id="top-img" src="top.png">
+        
+        <div id="ufo-container-wrapper" class="rotation-wrapper">
+            <div id="ufo-layer"></div>
+        </div>
+        
+        <div id="dock-layer"></div>
+    </div>
+
+    <script>
+        const socket = io();
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const ufoLayer = document.getElementById('ufo-layer');
+        const dockLayer = document.getElementById('dock-layer');
+        const wheelWrapper = document.getElementById('wheel-container-wrapper');
+        const ufoWrapper = document.getElementById('ufo-container-wrapper');
+        
+        let settings = { randomAvatars: false };
+        socket.on('settingsChange', (s) => settings = s);
+        fetch('/api/settings').then(r=>r.json()).then(s => settings = s || { randomAvatars: false });
+
+        let prizes = [];
+        let ships = {}; 
+        let winnersOnWheel = []; 
+        let globalRotation = 0;
+        const imgCache = {};
+
+        socket.emit('screen_join');
+
+        socket.on('init_screen', (data) => {
+            prizes = data.prizes;
+            winnersOnWheel = [];
+            data.winners.forEach(w => addToWheel(w.user, w.prizeName));
+            data.waitingUsers.forEach(u => updateDock(u, true));
+        });
+
+        // 重置视觉指令
+        socket.on('reset_all_visuals', () => {
+            winnersOnWheel = [];
+            for(let id in ships) { if(ships[id].el) ships[id].el.remove(); }
+            ships = {};
+            dockLayer.innerHTML = '';
+        });
+
+        socket.on('config_updated', (newPrizes) => { prizes = newPrizes; });
+        socket.on('user_online', u => updateDock(u, true));
+        socket.on('user_offline', u => { const el = document.getElementById(`dock-${u.idCard}`); if(el) el.remove(); });
+        socket.on('user_reset', (data) => {
+            // 从转盘上移除被重置的用户
+            winnersOnWheel = winnersOnWheel.filter(w => w.idCard !== data.idCard);
+        });
+
+        function getAvatarUrl(avatarPath, uId) { 
+            if (avatarPath && avatarPath.startsWith('http')) return avatarPath;
+            const isDefault = !avatarPath || avatarPath === 'default.png';
+            if (isDefault && settings.randomAvatars) {
+                // Determine index (1-20) based on user ID or random if not available
+                let idx = 1;
+                if(uId) {
+                    // Simple hash for string or number
+                    let hash = 0;
+                    const str = String(uId);
+                    for (let i = 0; i < str.length; i++) {
+                        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                    }
+                    idx = (Math.abs(hash) % 20) + 1;
+                } else {
+                    idx = Math.floor(Math.random() * 20) + 1;
+                }
+                return `/avatar/defaults/${idx}.jpg`;
+            }
+            return `/avatar/${avatarPath || 'default.png'}`; 
+        }
+        function loadImg(url) { if(imgCache[url]) return imgCache[url]; const img = new Image(); img.src = url; imgCache[url] = img; return img; }
+
+        function updateDock(user, add) {
+            if(Object.values(ships).find(s => s.userId === user.idCard)) return;
+            if(winnersOnWheel.find(w => w.idCard === user.idCard)) return;
+            const el = document.getElementById(`dock-${user.idCard}`);
+            if(add) {
+                if(!el) {
+                    const newEl = document.createElement('div');
+                    newEl.className = 'dock-avatar online';
+                    newEl.id = `dock-${user.idCard}`;
+                    newEl.style.backgroundImage = `url(${getAvatarUrl(user.avatar, user.idCard)})`;
+                    dockLayer.appendChild(newEl);
+                }
+            } else if(el) el.remove();
+        }
+
+        socket.on('player_launch', (data) => {
+            // 飞船ID统一处理
+            const shipId = data.idCard || data.id;
+            const dockEl = document.getElementById(`dock-${shipId}`);
+            if(dockEl) dockEl.remove();
+            if(ships[shipId]) return;
+
+            const ufo = document.createElement('div');
+            ufo.className = 'ufo';
+            ufo.style.backgroundImage = `url(${getAvatarUrl(data.avatar, shipId)})`;
+            ufo.style.opacity = '0';
+            ufo.style.borderRadius = '50%';
+            ufoLayer.appendChild(ufo);
+
+            // 淡入动画
+            setTimeout(() => { ufo.style.transition = 'opacity 0.3s'; ufo.style.opacity = '1'; }, 50);
+
+            ships[shipId] = {
+                el: ufo, 
+                userId: data.idCard,
+                avatarUrl: getAvatarUrl(data.avatar, shipId),
+                socketId: data.id || null,
+                angle: Math.random() * 360,
+                energy: 10000,  // 初始能量
+                targetEnergy: 10000,
+                maxEnergy: 10000,
+                selfAngle: Math.random() * 360,
+                selfSpin: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random() * 2.5),
+                state: 'FLYING'
+            };
+        });
+
+        socket.on('player_land', (data) => {
+            const shipId = data.user ? data.user.idCard : data.id;
+            const ship = ships[shipId];
+            if(!ship || ship.state !== 'FLYING') return;
+            
+            // 计算当前速度（基于能量，单位：度/帧）
+            const energyPercent = Math.max(0, Math.min(1, ship.energy / ship.maxEnergy));
+            const currentSpeedDeg = 6 + energyPercent * 54;
+            const currentSpeedRad = currentSpeedDeg * Math.PI / 180; // 转换为弧度
+            
+            // 计算最终落点并切换到LANDING状态
+            const finalPos = calcWheelPosition(data.prize.name, data.user.idCard);
+            if(finalPos) {
+                const initialAngle = ship.lastAngle || 0;
+                // 规范化初始角度到0-2π范围
+                const normalizedInitial = initialAngle % (Math.PI * 2);
+                // 计算从当前位置到目标的角度差
+                let angleDiff = finalPos.angle - normalizedInitial;
+                // 确保是正向旋转
+                if (angleDiff < 0) angleDiff += Math.PI * 2;
+                // 最终目标 = 当前角度 + 2圈(4π) + 角度差
+                // 注意必须是2π的整数倍，否则会导致最终位置有180度(如果是奇数π)的偏差，导致闪现
+                const targetAngle = initialAngle + Math.PI * 4 + angleDiff;
+                
+                ship.state = 'LANDING';
+                ship.landingData = {
+                    targetAngle: targetAngle,
+                    finalAngle: finalPos.angle, // 保存最终应该显示的角度
+                    targetRadius: finalPos.radius,
+                    prizeIndex: finalPos.prizeIndex,
+                    centerAngle: finalPos.centerAngle,
+                    currentAngle: initialAngle,
+                    initialAngle: initialAngle,
+                    currentRadius: ship.lastRadius || 200,
+                    startTime: Date.now(),
+                    duration: 2500 // 2.5秒到达目标
+                };
+                ship.prizeResult = data.prize.name;
+                ship.landingUser = data.user;
+            }
+            
+            // 从底部dock移除用户
+            if(data.user) {
+                updateDock(data.user, false);
+            }
+        });
+
+        socket.on('player_pause', (data) => {
+            const shipId = data.user ? data.user.idCard : data.id;
+            const ship = ships[shipId];
+            if(ship) {
+                // 淡出并移除
+                ship.el.style.transition = 'opacity 0.3s';
+                ship.el.style.opacity = '0';
+                setTimeout(() => {
+                    if(ship.el) ship.el.remove();
+                    delete ships[shipId];
+                }, 300);
+            }
+            if(data.user) updateDock(data.user, true);
+        });
+
+        // 计算转盘上的最终位置
+        function calcWheelPosition(prizeName, userId) {
+            const pIndex = prizes.findIndex(p => p.name === prizeName);
+            if(pIndex === -1) return null;
+
+            // 检查是否已在转盘上
+            if(winnersOnWheel.find(w => w.idCard === userId)) return null;
+
+            // 计算扇区角度
+            const totalWeight = prizes.reduce((sum, p) => sum + (parseInt(p.weight) || 0), 0);
+            if(totalWeight === 0) return null;
+            
+            let currentAngle = 0;
+            const prizeAngles = prizes.map(p => {
+                const weight = parseInt(p.weight) || 0;
+                const angleSize = (weight / totalWeight) * (2 * Math.PI);
+                const startAngle = currentAngle;
+                currentAngle += angleSize;
+                return { startAngle, endAngle: currentAngle };
+            });
+
+            const pa = prizeAngles[pIndex];
+            if(!pa) return null;
+            
+            const angleSize = pa.endAngle - pa.startAngle;
+            const centerAngle = pa.startAngle + angleSize / 2;
+            const edgeMargin = Math.min(angleSize * 0.22, 0.35);
+            const minAngle = pa.startAngle + edgeMargin;
+            const maxAngle = pa.endAngle - edgeMargin;
+            const minR = 140;
+            const maxR = 280;
+
+            // 检查现有位置避免重叠
+            const existingPoints = winnersOnWheel.map(w => {
+                const wpa = prizeAngles[w.prizeIndex];
+                if(!wpa) return null;
+                const wAngle = wpa.startAngle + (wpa.endAngle - wpa.startAngle) / 2 + w.randAngle;
+                return { x: Math.cos(wAngle) * w.randR, y: Math.sin(wAngle) * w.randR };
+            }).filter(Boolean);
+
+            let finalAngle = centerAngle;
+            let finalR = (minR + maxR) / 2;
+
+            // 尝试找不重叠的位置
+            for (let attempt = 0; attempt < 60; attempt++) {
+                const ringT = attempt / 60;
+                const radius = minR + ringT * (maxR - minR) + (Math.random() - 0.5) * 6;
+                const angle = minAngle + Math.random() * Math.max(0.0001, (maxAngle - minAngle));
+                const cx = Math.cos(angle) * radius;
+                const cy = Math.sin(angle) * radius;
+
+                const tooClose = existingPoints.some(p => {
+                    const dx = cx - p.x;
+                    const dy = cy - p.y;
+                    return (dx * dx + dy * dy) < (58 * 58);
+                });
+
+                if (!tooClose) {
+                    finalAngle = angle;
+                    finalR = radius;
+                    break;
+                }
+            }
+
+            return {
+                prizeIndex: pIndex,
+                angle: finalAngle, // 这是绝对角度（弧度）
+                radius: finalR,
+                centerAngle: centerAngle
+            };
+        }
+
+        // 将用户添加到转盘
+        function addWinnerToWheel(userId, avatarUrl, position) {
+            if(winnersOnWheel.find(w => w.idCard === userId)) return;
+            winnersOnWheel.push({
+                idCard: userId,
+                avatarUrl: avatarUrl,
+                prizeIndex: position.prizeIndex,
+                randR: position.radius,
+                randAngle: position.angle - position.centerAngle,
+                rotateDir: Math.random() < 0.5 ? -1 : 1
+            });
+            loadImg(avatarUrl);
+        }
+
+        // 初始化时添加已中奖用户到转盘（从init_screen调用）
+        function addToWheel(user, prizeName) {
+            const position = calcWheelPosition(prizeName, user.idCard);
+            if(position) {
+                addWinnerToWheel(user.idCard, getAvatarUrl(user.avatar, user.idCard), position);
+            }
+        }
+
+        // 接收能量同步更新
+        socket.on('energy_sync', (energyUpdates) => {
+            for (let shipId in ships) {
+                const ship = ships[shipId];
+                if (ship.socketId && energyUpdates[ship.socketId]) {
+                    ship.targetEnergy = energyUpdates[ship.socketId].energy;
+                    ship.maxEnergy = energyUpdates[ship.socketId].maxEnergy;
+                }
+            }
+        });
+
+        // 基于时间的旋转基准
+        const appStartTime = Date.now();
+        const rotationSpeed = 0.002 / (1000/60); // 转换原来的每帧0.002到每毫秒
+        // 原来每帧0.002弧度，假设60fps，即每秒 0.12 弧度
+        // 速度 = 0.12 / 1000 = 0.00012 rad/ms
+        
+        function render() {
+            // 整个容器旋转 - 基于时间计算
+            const now = Date.now();
+            globalRotation = (now - appStartTime) * 0.00012;
+            
+            const transform = `translate(-50%, -50%) rotate(${globalRotation}rad)`;
+            wheelWrapper.style.transform = transform;
+            ufoWrapper.style.transform = transform;
+
+            // 容器的中心点（相对于容器本身）
+            const containerSize = wheelWrapper.clientWidth;
+            const containerCx = containerSize / 2;
+            const containerCy = containerSize / 2;
+            
+            // Canvas是1000x1000，容器显示大小由CSS控制
+            const canvasToScreenRatio = containerSize / 1000;
+
+            for(let id in ships) {
+                const s = ships[id];
+
+                if(s.state === 'LANDING') {
+                    // 基于时间的缓动动画
+                    const elapsed = Date.now() - s.landingData.startTime;
+                    const progress = Math.min(1, elapsed / s.landingData.duration);
+                    
+                    // 使用缓出三次方曲线 (easeOutCubic)
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    
+                    // 计算当前角度 - 使用缓动
+                    const angleRange = s.landingData.targetAngle - s.landingData.initialAngle;
+                    s.landingData.currentAngle = s.landingData.initialAngle + angleRange * eased;
+                    
+                    // 计算当前半径 - 也使用缓动
+                    const initialRadius = s.landingData.currentRadius;
+                    if (!s.landingData.initialRadius) {
+                        s.landingData.initialRadius = initialRadius;
+                    }
+                    const radiusRange = s.landingData.targetRadius - s.landingData.initialRadius;
+                    s.landingData.currentRadius = s.landingData.initialRadius + radiusRange * eased;
+                    
+                    // 检查是否完成
+                    if (progress >= 1) {
+                        s.el.remove();
+                        // 使用保存的最终角度（已经是正确的奖品位置）
+                        addWinnerToWheel(s.userId, getAvatarUrl(s.landingUser.avatar, s.userId), {
+                            prizeIndex: s.landingData.prizeIndex,
+                            angle: s.landingData.finalAngle,
+                            radius: s.landingData.targetRadius,
+                            centerAngle: s.landingData.centerAngle
+                        });
+                        delete ships[id];
+                        continue;
+                    }
+                    
+                    const rad = s.landingData.currentAngle;
+                    const screenR = s.landingData.currentRadius * canvasToScreenRatio;
+                    const avatarHalfSize = Math.min(window.innerWidth, window.innerHeight) * 0.035 / 2;
+                    
+                    s.el.style.left = (containerCx + Math.cos(rad) * screenR - avatarHalfSize) + 'px';
+                    s.el.style.top = (containerCy + Math.sin(rad) * screenR - avatarHalfSize) + 'px';
+                    s.el.style.opacity = '1';
+                    
+                    // 自身旋转随着动画进度减慢
+                    s.selfAngle += s.selfSpin * (1 - eased * 0.7);
+                    s.el.style.transform = `rotate(${s.selfAngle}deg)`;
+                    
+                } else if(s.state === 'FLYING') {
+                    // 飞行逻辑（在静态坐标系内飞行）
+                    if (typeof s.targetEnergy === 'number') {
+                        s.energy = s.energy + (s.targetEnergy - s.energy) * 0.15;
+                    }
+                    
+                    // 线性能量计算
+                    const energyPercent = Math.max(0, Math.min(1, s.energy / s.maxEnergy));
+                    
+                    // 线性速度：调整最高速度，避免看不清 (原为 6+energyPercent*54)
+                    const speed = 2 + energyPercent * 14; 
+                    
+                    s.angle += speed;
+                    const rad = s.angle * Math.PI / 180;
+                    
+                    // 距离范围
+                    const minR = 240;
+                    const maxR = 600;
+                    const radius = minR + (maxR - minR) * energyPercent;
+                    s.lastRadius = radius;
+                    s.lastAngle = rad; // 保存当前角度（弧度）
+                    
+                    const screenR = radius * canvasToScreenRatio;
+                    // 动态计算头像大小
+                    const avatarHalfSize = Math.min(window.innerWidth, window.innerHeight) * 0.035 / 2;
+
+                    s.el.style.left = (containerCx + Math.cos(rad) * screenR - avatarHalfSize) + 'px';
+                    s.el.style.top = (containerCy + Math.sin(rad) * screenR - avatarHalfSize) + 'px';
+                    s.el.style.opacity = '1';
+
+                    s.selfAngle += s.selfSpin;
+                    s.el.style.transform = `rotate(${s.selfAngle}deg)`;
+                }
+            }
+
+            drawWheel();
+            requestAnimationFrame(render);
+        }
+
+        function drawWheel() {
+            const cx = 500, cy = 500, r = 480;
+            if(prizes.length === 0) return;
+
+            // 根据权重计算每个奖品的扇区角度
+            const totalWeight = prizes.reduce((sum, p) => sum + (parseInt(p.weight) || 0), 0);
+            if(totalWeight === 0) return;
+
+            // 计算每个奖品的起始和结束角度
+            let currentAngle = 0;
+            const prizeAngles = prizes.map(p => {
+                const weight = parseInt(p.weight) || 0;
+                const angleSize = (weight / totalWeight) * (2 * Math.PI);
+                const startAngle = currentAngle;
+                currentAngle += angleSize;
+                return { startAngle, endAngle: currentAngle, prize: p };
+            });
+
+            ctx.clearRect(0,0,1000,1000);
+            ctx.save();
+            ctx.translate(cx, cy);
+            // 不再旋转Canvas，整个容器会旋转
+            ctx.translate(-cx, -cy);
+
+            prizeAngles.forEach((pa, i) => {
+                const p = pa.prize;
+                const angle = pa.startAngle;
+                const angleSize = pa.endAngle - pa.startAngle;
+
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r, angle, pa.endAngle);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+                // 去除黑色描边
+                // ctx.lineWidth = 1;
+                // ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                // ctx.stroke();
+
+                // 绘制文字（在扇区中心）
+                const midAngle = angle + angleSize / 2;
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(midAngle);
+                ctx.textAlign = "right";
+                // 文字改为黑色，无阴影
+                ctx.fillStyle = "#000"; 
+                ctx.font = "bold 34px Arial";
+                ctx.shadowBlur = 0; // 去除阴影
+
+                const str = p.name;
+                const lineHeight = 38;
+                let currentR = r - 50; 
+
+                for(let j=0; j<str.length; j++) {
+                    const char = str[j];
+                    ctx.save();
+                    ctx.translate(currentR, 0); 
+                    ctx.rotate(Math.PI / 2);
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(char, 0, 0);
+                    ctx.restore();
+                    // 只有中文才竖排，或者全部竖排？用户说"垂直于中心的那样的排版"，应该是竖排。
+                    // 简单起见全部竖排
+                    currentR -= lineHeight;
+                }
+                ctx.restore();
+            });
+
+            winnersOnWheel.forEach(w => {
+                // 找到对应奖品的扇区
+                const pa = prizeAngles[w.prizeIndex];
+                if(!pa) return;
+
+                const angleSize = pa.endAngle - pa.startAngle;
+                const baseAngle = pa.startAngle + angleSize/2 + w.randAngle;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(baseAngle);
+                const img = loadImg(w.avatarUrl);
+                if(img.complete) {
+                    ctx.save();
+                    ctx.translate(w.randR, 0);
+                    // 结果头像固定在转盘上，不自转
+                    // 先创建裁剪路径
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 25, 0, Math.PI*2);
+                    ctx.closePath();
+                    ctx.clip();
+                    // 绘制图像
+                    ctx.drawImage(img, -25, -25, 50, 50);
+                    ctx.restore();
+                    // 绘制边框
+                    ctx.save();
+                    ctx.translate(w.randR, 0);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 25, 0, Math.PI*2);
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                ctx.restore();
+            });
+            ctx.restore();
+        }
+        render();
+    </script>
+</body>
+</html>

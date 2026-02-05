@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+    <script>LA.init({id:"KhGqLj2WnzNaM08Z",ck:"KhGqLj2WnzNaM08Z",autoTrack:true,hashMode:true,screenRecord:true})</script>
+    <title>抽奖管理后台</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            background: #0a0a0a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+        }
+        
+        .auto-save-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .auto-save-indicator.show {
+            opacity: 1;
+        }
+        
+        .header {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #2a2a2a;
+        }
+        
+        .header h1 { 
+            font-size: 24px;
+            color: #ffffff;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .panel { 
+            background: #1a1a1a; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border: 1px solid #2a2a2a;
+        }
+        
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 16px; 
+        }
+        
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        table { 
+            width: 100%; 
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 12px;
+        }
+        
+        th { 
+            background: #0a0a0a;
+            color: #888;
+            padding: 12px 14px; 
+            text-align: left; 
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        th:first-child { border-radius: 6px 0 0 0; }
+        th:last-child { border-radius: 0 6px 0 0; }
+        
+        td { 
+            padding: 12px 14px; 
+            border-bottom: 1px solid #2a2a2a;
+            color: #e0e0e0;
+        }
+        
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #0a0a0a; }
+
+        input[type="text"], input[type="number"] {
+            background: #0a0a0a;
+            border: 1px solid #2a2a2a;
+            color: #e0e0e0;
+            padding: 9px 12px;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        input[type="text"]:focus, input[type="number"]:focus { 
+            border-color: #4a4a4a;
+            background: #000000;
+            outline: none;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 9px 18px;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        button:hover { 
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+        
+        button:active { transform: translateY(0); }
+        
+        .btn-primary { background: #1976d2; }
+        .btn-success { background: #388e3c; }
+        .btn-danger { background: #d32f2f; padding: 7px 12px; font-size: 12px; }
+        .btn-warning { background: #f57c00; }
+        .btn-secondary { background: #0097a7; }
+        .btn-reset { background: #616161; }
+
+        .color-input-wrapper { 
+            position: relative;
+            width: 50px;
+            height: 34px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #2a2a2a;
+        }
+        
+        input[type="color"] {
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            width: calc(100% + 4px);
+            height: calc(100% + 4px);
+            border: none;
+            cursor: pointer;
+        }
+        
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; }
+
+        .log-entry { 
+            padding: 10px 14px;
+            border-left: 3px solid #666;
+            background: #0a0a0a;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .log-time { color: #666; font-size: 11px; }
+        .log-prize { color: #ffa726; font-weight: 600; }
+        .log-user { color: #42a5f5; font-weight: 600; }
+
+        .input-group { 
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 14px 0;
+            flex-wrap: wrap;
+        }
+        
+        .input-group label { 
+            min-width: 100px;
+            color: #888;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .input-group input { width: 130px; }
+
+        .message { 
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 10px 0;
+            display: none;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .message.error { 
+            background: #3a1a1a;
+            color: #ff5252;
+            border-left: 3px solid #d32f2f;
+        }
+        
+        .message.success { 
+            background: #1a3a1a;
+            color: #4caf50;
+            border-left: 3px solid #388e3c;
+        }
+        
+        .alert-panel {
+            background: #2a1a1a;
+            border: 1px solid #442222;
+        }
+        
+        .alert-panel .panel-title {
+            color: #ff8a80;
+            border-bottom-color: #442222;
+        }
+        
+        .alert-panel input {
+            background: #1a0a0a;
+            border: 1px solid #442222;
+            color: #e0e0e0;
+        }
+        
+        .alert-panel label {
+            color: #ccc;
+        }
+
+        .floating-controls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 2000;
+        }
+
+        .floating-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .floating-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .floating-btn.save-btn {
+            background: #1976d2;
+            color: white;
+        }
+
+        .floating-btn.refresh-btn {
+            background: #424242;
+            color: white;
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            z-index: 2001;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .toast-msg {
+            padding: 12px 24px;
+            border-radius: 50px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideInRight 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .tools-menu-container {
+            position: relative;
+        }
+
+        .tools-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid #444;
+            background: #2a2a2a;
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .tools-btn:hover {
+            background: #333;
+            transform: rotate(90deg);
+        }
+
+        .tools-dropdown {
+            position: absolute;
+            top: 50px;
+            right: 0;
+            width: 300px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 1000;
+        }
+
+        .tools-dropdown.show { display: block; animation: fadeIn 0.2s; }
+
+        .tool-section { margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 15px; }
+        .tool-section:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+        
+        .tool-title { font-size: 14px; color: #888; font-weight: 600; margin-bottom: 10px; display: block; }
+
+        .tool-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .tool-input-row label { font-size: 12px; color: #aaa; width: 60px; }
+        .tool-input-row input { flex: 1; background: #1a1a1a; border-color: #444; padding: 6px; font-size: 13px; }
+
+        .tool-btn {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎰 抽奖管理后台</h1>
+            <div class="tools-menu-container">
+                <button class="tools-btn" onclick="toggleToolsMenu()">➕</button>
+                <div class="tools-dropdown" id="toolsDropdown">
+                    <div class="tool-section">
+                        <span class="tool-title">⚡ 压力测试</span>
+                        <div class="tool-input-row">
+                            <label>人数</label>
+                            <input type="number" id="stressCount" value="100">
+                        </div>
+                        <div class="tool-input-row">
+                            <label>时长(秒)</label>
+                            <input type="number" id="stressTime" value="60">
+                        </div>
+                        <button class="btn-warning tool-btn" onclick="runStressTest()">🔥 启动测试</button>
+                        <p style="font-size: 11px; opacity: 0.6; margin-top: 8px; text-align: center;">测试数据不会写入数据库</p>
+                    </div>
+
+                    <div class="tool-section">
+                        <span class="tool-title"> 游戏控制</span>
+                        <button class="btn-reset tool-btn" onclick="resetGame()">🔄 重置所有数据</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">⚙️ 全局设置</div>
+            </div>
+            <div style="display: flex; gap: 20px; align-items: center; padding: 10px 0;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: #fff;">
+                    <input type="checkbox" id="randomAvatarToggle" onchange="toggleRandomAvatars(this)" style="width: 20px; height: 20px;">
+                    <span>缺省头像使用随机真人照片 (Use Random Real Photos for Default Avatars)</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">🏆 奖品配置</div>
+                <div class="btn-group">
+                    <button class="btn-success" onclick="addPrize()">➕ 添加奖品</button>
+                </div>
+            </div>
+            <table id="prizeTable">
+                <thead><tr><th style="width: 35%;">奖品名称</th><th style="width: 15%;">库存数量</th><th style="width: 15%;">中奖权重</th><th style="width: 25%;">颜色</th><th style="width: 10%;">操作</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">👥 用户管理</div>
+                <div class="btn-group">
+                    <button class="btn-success" onclick="addUser()">➕ 添加用户</button>
+                </div>
+            </div>
+            <table id="userTable">
+                <thead><tr><th style="width: 25%;">姓名</th><th style="width: 25%;">身份证后8位</th><th style="width: 20%;">头像</th><th style="width: 10%;">积分</th><th style="width: 10%;">操作</th><th style="width: 10%;">重置</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <div id="message" class="message"></div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">📋 中奖记录</div>
+            </div>
+            <div id="logContainer" style="max-height: 400px; overflow-y: auto; margin-top: 10px;">
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <div class="floating-controls">
+        <button class="floating-btn refresh-btn" onclick="location.reload()" title="刷新页面">🔄</button>
+        <button class="floating-btn save-btn" onclick="saveAllData()" title="保存所有数据">💾</button>
+    </div>
+
+    <script>
+        let db = { users: [], prizes: [] };
+
+        function loadData() {
+            fetch('/api/data').then(r=>r.json()).then(data => {
+                db = data;
+                renderSettings();
+                renderPrizes();
+                renderUsers();
+                renderLogs();
+            });
+        }
+
+        function renderSettings() {
+            if (db.settings && db.settings.randomAvatars !== undefined) {
+                document.getElementById('randomAvatarToggle').checked = db.settings.randomAvatars;
+            }
+        }
+
+        function toggleRandomAvatars(checkbox) {
+            const newVal = checkbox.checked;
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ randomAvatars: newVal })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    showMessage('设置已保存', 'success');
+                    db.settings.randomAvatars = newVal;
+                } else {
+                    showMessage('保存失败', 'error');
+                    checkbox.checked = !newVal; // Revert
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                showMessage('保存异常', 'error');
+                checkbox.checked = !newVal;
+            });
+        }
+
+        loadData();
+
+        function showMessage(msg, type = 'error') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return; // Safety check
+            
+            const div = document.createElement('div');
+            const icon = type === 'success' ? '✅' : '⚠️';
+            const bgColor = type === 'success' ? '#388e3c' : '#d32f2f';
+            
+            div.className = 'toast-msg';
+            div.style.backgroundColor = bgColor;
+            div.innerHTML = `${icon} ${msg}`;
+            
+            container.appendChild(div);
+            
+            setTimeout(() => {
+                div.style.transition = 'all 0.3s ease';
+                div.style.opacity = '0';
+                div.style.transform = 'translateY(20px)';
+                setTimeout(() => div.remove(), 300);
+            }, 3000);
+        }
+
+        function saveAllData() {
+            // Using a simple lock to prevent double clicks if needed, but throttle is better handled by UI
+            const btn = document.querySelector('.floating-btn.save-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳';
+            btn.style.pointerEvents = 'none';
+
+            Promise.all([
+                fetch('/api/prizes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(db.prizes) }).then(r=>r.json()),
+                fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(db.users) }).then(r=>r.json())
+            ]).then(([pRes, uRes]) => {
+                if(pRes.success && uRes.success) {
+                    showMessage('所有数据已保存', 'success');
+                } else {
+                    showMessage('保存遇到问题', 'error');
+                }
+            }).catch(e => {
+                showMessage('网络或服务器错误', 'error');
+            }).finally(() => {
+                btn.innerHTML = originalText;
+                btn.style.pointerEvents = 'auto';
+            });
+        }
+
+        function renderPrizes() {
+            const tbody = document.querySelector('#prizeTable tbody');
+            tbody.innerHTML = '';
+            db.prizes.forEach((p, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" value="${p.name}" oninput="db.prizes[${i}].name=this.value"></td>
+                    <td><input type="number" value="${p.stock}" oninput="db.prizes[${i}].stock=this.value"></td>
+                    <td><input type="number" value="${p.weight}" oninput="db.prizes[${i}].weight=this.value"></td>
+                    <td>
+                        <div class="color-input-wrapper">
+                            <input type="color" value="${p.color}" oninput="db.prizes[${i}].color=this.value">
+                        </div>
+                    </td>
+                    <td><button class="btn-danger" onclick="deletePrize(${i})">删除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addPrize() {
+            const colors = ['#00f3ff', '#ffd700', '#ff0055', '#00ff00', '#9c27b0', '#ff9800'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const newId = db.prizes.length > 0 ? Math.max(...db.prizes.map(p => p.id)) + 1 : 1;
+            db.prizes.push({
+                id: newId,
+                name: '新奖品',
+                stock: 10,
+                weight: 10,
+                color: randomColor
+            });
+            renderPrizes();
+        }
+
+        function deletePrize(index) {
+            db.prizes.splice(index, 1);
+            renderPrizes();
+        }
+
+        function savePrizes() {
+            return fetch('/api/prizes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(db.prizes) })
+                .then(r => r.json())
+                .then(res => {
+                    if(!res.success) showMessage('保存失败', 'error');
+                });
+        }
+
+        function renderUsers() {
+            const tbody = document.querySelector('#userTable tbody');
+            tbody.innerHTML = '';
+            db.users.forEach((u, i) => {
+                const tr = document.createElement('tr');
+                const hasHistory = u.history && u.history.length > 0;
+                tr.innerHTML = `
+                    <td><input type="text" value="${u.name}" oninput="db.users[${i}].name=this.value"></td>
+                    <td><input type="text" value="${u.idCard}" maxlength="8" oninput="db.users[${i}].idCard=this.value"></td>
+                    <td><input type="text" value="${u.avatar}" oninput="db.users[${i}].avatar=this.value"></td>
+                    <td>${u.energy}</td>
+                    <td><button class="btn-danger" onclick="deleteUser(${i})">删除</button></td>
+                    <td><button class="btn-warning" onclick="resetUserEnergy(${i})" ${!hasHistory ? 'disabled style="opacity:0.3;cursor:not-allowed;"' : ''}>重置能量</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function saveUsers() {
+            return fetch('/api/users', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(db.users) })
+                .then(r => r.json())
+                .then(res => {
+                    if(!res.success) showMessage(res.error || '保存失败', 'error');
+                });
+        }
+
+        function addUser() {
+            const randomId = Math.floor(10000000 + Math.random() * 90000000);
+            db.users.push({
+                name: '新用户',
+                idCard: randomId.toString(),
+                avatar: 'default.png',
+                energy: 10000,
+                history: []
+            });
+            renderUsers();
+        }
+
+        function deleteUser(index) {
+            db.users.splice(index, 1);
+            renderUsers();
+        }
+
+        function resetUserEnergy(index) {
+            const user = db.users[index];
+            if(user.history && user.history.length > 0) {
+                user.energy = 10000;
+                user.history = [];
+                saveUsers().then(() => {
+                    // 重置能量后刷新数据
+                    loadData();
+                    showMessage(`用户 ${user.name} 能量已重置，可重新抽奖`, 'success');
+                });
+            }
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logContainer');
+            container.innerHTML = '';
+            const allLogs = [];
+            db.users.forEach(u => {
+                if(u.history && u.history.length > 0) {
+                    u.history.forEach(h => {
+                        allLogs.push({ name: u.name, prize: h.prize, time: h.time });
+                    });
+                }
+            });
+            allLogs.sort((a, b) => new Date(b.time) - new Date(a.time));
+            allLogs.forEach(log => {
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                div.innerHTML = `
+                    <div><span class="log-time">${log.time}</span> <span class="log-user">${log.name}</span></div>
+                    <div>获得: <span class="log-prize">${log.prize}</span></div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function resetGame() {
+            if(confirm('清空所有历史数据和视觉显示吗？')) {
+                fetch('/api/reset-game', { method: 'POST' }).then(() => {
+                    location.reload();
+                });
+            }
+        }
+
+        function runStressTest() {
+            const count = document.getElementById('stressCount').value;
+            const time = document.getElementById('stressTime').value;
+            
+            // 保存到localStorage，刷新页面后不会丢失
+            localStorage.setItem('stressCount', count);
+            localStorage.setItem('stressTime', time);
+            
+            // 直接发送，不需要确认
+            fetch('/api/stress-test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ userCount: parseInt(count), durationSeconds: parseInt(time) })
+            });
+        }
+        
+        // 页面加载时从localStorage恢复参数
+        window.addEventListener('load', () => {
+            const savedCount = localStorage.getItem('stressCount');
+            const savedTime = localStorage.getItem('stressTime');
+            if (savedCount) document.getElementById('stressCount').value = savedCount;
+            if (savedTime) document.getElementById('stressTime').value = savedTime;
+        });
+
+        function toggleToolsMenu() {
+            const menu = document.getElementById('toolsDropdown');
+            menu.classList.toggle('show');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.querySelector('.tools-menu-container');
+            const menu = document.getElementById('toolsDropdown');
+            if (!container.contains(e.target) && menu.classList.contains('show')) {
+                menu.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "lucky-draw-system",
+  "version": "3.0.0",
+  "description": "通用抽奖系统",
+  "main": "server.js",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "socket.io-client": "^4.8.3"
+  }
+}
